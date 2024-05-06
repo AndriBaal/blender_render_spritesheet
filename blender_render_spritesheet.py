@@ -29,7 +29,7 @@ class SpritesheetOperator(bpy.types.Operator):
         return self.render_sprite_sheet()
     
     def render_sprite_sheet(self):
-        selected_objects = bpy.context.selected_objects
+        active_object = bpy.context.active_object
         scene = bpy.context.scene
         output_path = scene.render.filepath
         temp_path = bpy.app.tempdir
@@ -44,51 +44,51 @@ class SpritesheetOperator(bpy.types.Operator):
         
         frame_step = 1
         frame_start = scene.frame_start
-        frame_end = scene.frame_start + 1
+        frame_end = scene.frame_end + 1
+        print(f"start: {frame_start} end: {frame_end}")
         frame_amount = frame_end - frame_start
         
-        for object in selected_objects:
-            bpy.context.scene.objects[object.name].select_set(True)
-            original_rotation = object.rotation_euler[2]
+        bpy.context.scene.objects[active_object.name].select_set(True)
+        original_rotation = active_object.rotation_euler[2]
 
-            action = object.animation_data.action
-            action_folder = os.path.join(temp_path, action.name)
-            if not os.path.exists(action_folder):
-                os.makedirs(action_folder)
+        action = active_object.animation_data.action
+        action_folder = os.path.join(temp_path, action.name)
+        if not os.path.exists(action_folder):
+            os.makedirs(action_folder)
 
-            sprite_sheet_width = sprite_width * frame_amount
-            sprite_sheet_height = sprite_height * len(self.DIRECTIONS)
-            sprite_sheet = bpy.data.images.new('SpriteSheet', width=sprite_sheet_width,
-                                                    height=sprite_sheet_height, alpha=True)
-            buffer = [0.0] * (sprite_sheet_width * sprite_sheet_height * self.BYTES_PER_PIXEL)
-            sprite_sheet_row_size = sprite_sheet.size[0] * self.BYTES_PER_PIXEL
-            sprite_row_size = sprite_width * self.BYTES_PER_PIXEL
-            
-            for idx, (direction, angle) in enumerate(self.DIRECTIONS):
-                animation_folder = os.path.join(action_folder, direction)
-                if not os.path.exists(animation_folder):
-                    os.makedirs(animation_folder)
+        sprite_sheet_width = sprite_width * frame_amount
+        sprite_sheet_height = sprite_height * len(self.DIRECTIONS)
+        sprite_sheet = bpy.data.images.new('SpriteSheet', width=sprite_sheet_width,
+                                                height=sprite_sheet_height, alpha=True)
+        buffer = [0.0] * (sprite_sheet_width * sprite_sheet_height * self.BYTES_PER_PIXEL)
+        sprite_sheet_row_size = sprite_sheet.size[0] * self.BYTES_PER_PIXEL
+        sprite_row_size = sprite_width * self.BYTES_PER_PIXEL
+        
+        for idx, (direction, angle) in enumerate(self.DIRECTIONS):
+            animation_folder = os.path.join(action_folder, direction)
+            if not os.path.exists(animation_folder):
+                os.makedirs(animation_folder)
 
-                object.rotation_euler[2] = math.radians(angle)
-                sprite_row_offset = sprite_sheet_row_size * sprite_height * idx
-                for i, frame in enumerate(range(frame_start, frame_end, frame_step)):
-                    scene.frame_current = frame
+            active_object.rotation_euler[2] = math.radians(angle)
+            sprite_row_offset = sprite_sheet_row_size * sprite_height * idx
+            for i, frame in enumerate(range(frame_start, frame_end, frame_step)):
+                scene.frame_current = frame
 
-                    file_path = os.path.join(animation_folder, f'{scene.frame_current}.png')
-                    scene.render.filepath = file_path
-                    bpy.ops.render.render(write_still=True)
-                    sprite = bpy.data.images.load(file_path)
+                file_path = os.path.join(animation_folder, f'{scene.frame_current}.png')
+                scene.render.filepath = file_path
+                bpy.ops.render.render(write_still=True)
+                sprite = bpy.data.images.load(file_path)
 
-                    frame_offset = sprite_row_size * i
-                    for row in range(sprite_height):
-                        row_offset = row * sprite_sheet_row_size
-                        offset = sprite_row_offset + frame_offset + row_offset
-                        row_offset_sprite = row * sprite_row_size
-                        buffer[offset:offset + sprite_row_size] = sprite.pixels[row_offset_sprite:row_offset_sprite + sprite_row_size]
-            
-            sprite_sheet.pixels = buffer
-            sprite_sheet.save(filepath=os.path.join(output_path, action.name + '.png'))
-            object.rotation_euler[2] = original_rotation
+                frame_offset = sprite_row_size * i
+                for row in range(sprite_height):
+                    row_offset = row * sprite_sheet_row_size
+                    offset = sprite_row_offset + frame_offset + row_offset
+                    row_offset_sprite = row * sprite_row_size
+                    buffer[offset:offset + sprite_row_size] = sprite.pixels[row_offset_sprite:row_offset_sprite + sprite_row_size]
+        
+        sprite_sheet.pixels = buffer
+        sprite_sheet.save(filepath=os.path.join(output_path, action.name + '.png'))
+        active_object.rotation_euler[2] = original_rotation
 
         scene.render.filepath = output_path
         scene.frame_current = original_frame
@@ -103,7 +103,6 @@ def draw_func(self, _context):
 def register():
     bpy.utils.register_class(SpritesheetOperator)
     bpy.types.TOPBAR_MT_render.append(draw_func)
-    print('Test')
 
 def unregister():
     bpy.utils.unregister_class(SpritesheetOperator)

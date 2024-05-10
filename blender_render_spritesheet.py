@@ -5,7 +5,7 @@ import math
 bl_info = {
     "name": "Render Spritesheet",
     "bpy": (4, 10, 0),
-    "category": "Object",
+    "category": "Render",
 }
 
 class SpritesheetOperator(bpy.types.Operator):
@@ -45,7 +45,6 @@ class SpritesheetOperator(bpy.types.Operator):
         frame_step = 1
         frame_start = scene.frame_start
         frame_end = scene.frame_end + 1
-        print(f"start: {frame_start} end: {frame_end}")
         frame_amount = frame_end - frame_start
         
         bpy.context.scene.objects[active_object.name].select_set(True)
@@ -98,6 +97,7 @@ class SpritesheetOperator(bpy.types.Operator):
 
 def draw_func(self, _context):
     layout = self.layout
+    layout.separator()
     layout.operator("render.render_spritesheet", icon='RENDER_ANIMATION')
 
 def register():
@@ -107,7 +107,6 @@ def register():
 def unregister():
     bpy.utils.unregister_class(SpritesheetOperator)
     bpy.types.TOPBAR_MT_render.remove(draw_func)
-
 
 if __name__ == "__main__":
     register()

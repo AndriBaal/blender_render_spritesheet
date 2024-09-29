@@ -15,23 +15,26 @@ class SpritesheetOperator(bpy.types.Operator):
 
     BYTES_PER_PIXEL = 4
     DIRECTIONS = [
-        ('SW', 45),
-        ('W', 90),
-        ('NW', 135),
-        ('N', 180),
-        ('NE', 225),
-        ('E', 270),
-        ('SE', 315),
-        ('S', 0),
+        'SW',
+        'W',
+        'NW',
+        'N',
+        'NE',
+        'E',
+        'SE',
+        'S'
     ]
+    ROTATION = math.radians(360.0 / len(DIRECTIONS))
 
     def execute(self, context):
         return self.render_sprite_sheet()
     
     def render_sprite_sheet(self):
         active_object = bpy.context.active_object
+        action = active_object.animation_data.action
         scene = bpy.context.scene
         output_path = scene.render.filepath
+        camera = scene.camera
         temp_path = bpy.app.tempdir
 
         sprite_width = scene.render.resolution_x
@@ -43,14 +46,13 @@ class SpritesheetOperator(bpy.types.Operator):
         original_frame = scene.frame_current
         
         frame_step = 1
-        frame_start = scene.frame_start
-        frame_end = scene.frame_end + 1
+        frame_start = int(action.frame_start if action.use_frame_range else scene.frame_start)
+        frame_end = int(action.frame_end if action.use_frame_range else scene.frame_end) + 1
         frame_amount = frame_end - frame_start
         
         bpy.context.scene.objects[active_object.name].select_set(True)
-        original_rotation = active_object.rotation_euler[2]
+        original_camera = camera.location, camera.rotation_euler[2]
 
-        action = active_object.animation_data.action
         action_folder = os.path.join(temp_path, action.name)
         if not os.path.exists(action_folder):
             os.makedirs(action_folder)
@@ -63,12 +65,27 @@ class SpritesheetOperator(bpy.types.Operator):
         sprite_sheet_row_size = sprite_sheet.size[0] * self.BYTES_PER_PIXEL
         sprite_row_size = sprite_width * self.BYTES_PER_PIXEL
         
-        for idx, (direction, angle) in enumerate(self.DIRECTIONS):
+        for idx, direction in enumerate(self.DIRECTIONS):
             animation_folder = os.path.join(action_folder, direction)
             if not os.path.exists(animation_folder):
                 os.makedirs(animation_folder)
 
-            active_object.rotation_euler[2] = math.radians(angle)
+            pivot_point = active_object.location
+
+            translated_x = camera.location.x - pivot_point[0]
+            translated_y = camera.location.y - pivot_point[1]
+            translated_z = camera.location.z - pivot_point[2]
+
+            rotated_x = translated_x * math.cos(self.ROTATION) - translated_y * math.sin(self.ROTATION)
+            rotated_y = translated_x * math.sin(self.ROTATION) + translated_y * math.cos(self.ROTATION)
+
+            camera.location.x = rotated_x + pivot_point[0]
+            camera.location.y = rotated_y + pivot_point[1]
+            camera.location.z = translated_z + pivot_point[2]
+
+            camera.rotation_euler[2] += self.ROTATION
+
+
             sprite_row_offset = sprite_sheet_row_size * sprite_height * idx
             for i, frame in enumerate(range(frame_start, frame_end, frame_step)):
                 scene.frame_current = frame
@@ -87,18 +104,18 @@ class SpritesheetOperator(bpy.types.Operator):
         
         sprite_sheet.pixels = buffer
         sprite_sheet.save(filepath=os.path.join(output_path, action.name + '.png'))
-        active_object.rotation_euler[2] = original_rotation
+        camera.location, camera.rotation_euler[2] = original_camera
 
         scene.render.filepath = output_path
         scene.frame_current = original_frame
         
-        print("Finished rendering Spritesheet!")
+        print('Finished rendering Spritesheet!')
         return {'FINISHED'}
 
 def draw_func(self, _context):
     layout = self.layout
     layout.separator()
-    layout.operator("render.render_spritesheet", icon='RENDER_ANIMATION')
+    layout.operator('render.render_spritesheet', icon='RENDER_ANIMATION')
 
 def register():
     bpy.utils.register_class(SpritesheetOperator)
@@ -108,5 +125,5 @@ def unregister():
     bpy.utils.unregister_class(SpritesheetOperator)
     bpy.types.TOPBAR_MT_render.remove(draw_func)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     register()

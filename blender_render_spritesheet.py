@@ -33,7 +33,7 @@ class SpritesheetOperator(bpy.types.Operator):
         active_object = bpy.context.active_object
         action = active_object.animation_data.action
         scene = bpy.context.scene
-        output_path = scene.render.filepath
+        output_path = os.path.dirname(bpy.data.filepath)
         camera = scene.camera
         temp_path = bpy.app.tempdir
 
